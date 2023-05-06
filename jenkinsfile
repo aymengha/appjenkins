@@ -1,34 +1,70 @@
 pipeline {
     agent any
+    tools {
+        nodejs "test"
+    }
 
 stages {
-    stage("clone code") {
+       stage("clone code") {
+       steps {
+        script {
+                // let's clone the source
+         git branch: 'main', credentialsId: 'gitlabcreduserpass', url: 'http://172.18.0.9/root/angularspringapp'
+                
+           }
+}
+   }
+
+
+    stage("maven build ") {
         steps {
             script {
-                // let's clone the source
-            sh "git clone https://github.com/Chamssiddine/DevOps-Mentorship.git"
+                withMaven() {
+                    sh './mvnw clean install'
+                }
                 
             }
         }
     }
-
-
-    stage("Test") {
-        steps {
-            script {
-                // let's clone the source
-            sh "echo testing... "
-                
-            }
-        }
+    
+    
+    stage('npm install') {
+    steps {
+        
+            echo "Performing npm install..."
+            sh 'npm install'
+        
     }
+}
 
-    stage("Build code") {
+    
+          stage("build & SonarQube analysis") {
+        
+            steps {
+              withSonarQubeEnv('SonarQube') {
+                               sh './mvnw org.sonarsource.scanner.maven:sonar-maven-plugin:3.7.0.1746:sonar -e -Dsonar.qualitygate.wait=true'
+                               }
+            }
+          }
+       
+          stage("docker  build") {
         steps {
             // let's clone the source
             
             script {
-                sh "echo builiding .... "
+           sh "./mvnw -Pprod verify jib:dockerBuild"
+            }
+        }
+    }
+
+    stage("push to nexus") {
+        steps {
+            // let's clone the source
+            
+            script {
+                      sh "docker login -u admin -p admin 172.18.0.8:8085 "
+                sh "docker tag mainapp 172.18.0.8:8085/test/mainapp:latest"
+                sh "docker push 172.18.0.8:8085/test/mainapp:latest"
             }
         }
     }
